@@ -11,7 +11,7 @@ Default:
     lead    = 5 days
 
 Outputs:
-    /ybz/ybz/2026/MHWNeurRL/data/forecast_h10_l5/
+    outputs/03_forecast_dataset_h10_l5/
         X_train.npy, y_train.npy, target_dates_train.npy
         X_val.npy,   y_val.npy,   target_dates_val.npy
         X_test.npy,  y_test.npy,  target_dates_test.npy

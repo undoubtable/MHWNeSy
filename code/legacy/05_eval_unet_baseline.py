@@ -3,7 +3,7 @@
 Evaluate U-Net baseline and save predictions for NeurRL event verifier.
 
 Outputs:
-    /ybz/ybz/2026/MHWNeurRL/runs/04_unet_baseline_h10_l5/
+    outputs/04_unet_baseline_h10_l5/
         eval_metrics.csv
         pred_prob_train.npy, pred_mask_train.npy
         pred_prob_val.npy,   pred_mask_val.npy

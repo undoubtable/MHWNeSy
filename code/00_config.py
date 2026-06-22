@@ -7,9 +7,13 @@ import os
 #   export MHWNEURRL_ROOT=/path/to/MHWNeurRL
 ROOT = Path(os.environ.get("MHWNEURRL_ROOT", Path(__file__).resolve().parents[1]))
 
-RAW_NC = ROOT / "data" / "oisst_scs_1982_2023.nc"
-
+DATA_DIR = ROOT / "data"
 OUTPUT_DIR = ROOT / "outputs"
+CODE_DIR = ROOT / "code"
+LEGACY_CODE_DIR = CODE_DIR / "legacy"
+
+RAW_NC = DATA_DIR / "oisst_scs_1982_2023.nc"
+
 LABEL_DIR = OUTPUT_DIR / "01_mhw_labels"
 FIGURE_DIR = OUTPUT_DIR / "02_label_visualization"
 FORECAST_DIR = OUTPUT_DIR / "03_forecast_dataset_h10_l5"

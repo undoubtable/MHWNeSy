@@ -5,11 +5,13 @@ __pycache__/
 
 # VS Code / local settings
 .vscode/
+.idea/
 
 # Data and generated outputs
 data/
 outputs/
 logs/
+runs/
 
 # Large scientific/model files
 *.nc
@@ -20,6 +22,11 @@ logs/
 *.h5
 *.hdf5
 *.ckpt
+*.pkl
+*.joblib
+
+# Local backups
+*.bak
 
 # Archives
 *.zip

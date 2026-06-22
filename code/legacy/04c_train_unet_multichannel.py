@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Train a simple U-Net baseline for MHW mask forecasting.
+Train a multichannel U-Net baseline for MHW mask forecasting.
 
 Input:
-    /ybz/ybz/2026/MHWNeurRL/data/forecast_h10_l5/
+    outputs/03b_forecast_dataset_multichannel_h10_l5/
 
 Output:
-    /ybz/ybz/2026/MHWNeurRL/runs/04_unet_baseline_h10_l5/
+    outputs/04c_unet_multichannel_h10_l5/
         best_model.pt
         train_log.csv
         config.json
@@ -59,7 +59,7 @@ class DoubleConv(nn.Module):
 
 
 class UNetSmall(nn.Module):
-    def __init__(self, in_ch=10, base=32):
+    def __init__(self, in_ch=40, base=32):
         super().__init__()
         self.enc1 = DoubleConv(in_ch, base)
         self.enc2 = DoubleConv(base, base * 2)
@@ -133,9 +133,18 @@ def evaluate(model, loader, device, threshold=0.5):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default=str(cfg.FORECAST_DIR))
-    parser.add_argument("--run_dir", type=str, default=str(cfg.UNET_RUN_DIR))
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default=str(cfg.OUTPUT_DIR / "03b_forecast_dataset_multichannel_h10_l5"),
+    )
+    parser.add_argument(
+        "--run_dir",
+        type=str,
+        default=str(cfg.OUTPUT_DIR / "04c_unet_multichannel_h10_l5"),
+    )
     parser.add_argument("--history", type=int, default=10)
+    parser.add_argument("--n_features", type=int, default=4)
     parser.add_argument("--base", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -148,11 +157,15 @@ def main():
     run_dir = Path(args.run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    in_ch = args.history * args.n_features
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("[DEVICE]", device)
+    print("[IN CHANNELS]", in_ch)
 
     train_ds = NpySegDataset(data_dir, "train")
     val_ds = NpySegDataset(data_dir, "val")
+    if train_ds.X.shape[1] != in_ch:
+        raise ValueError(f"Expected {in_ch} input channels, got {train_ds.X.shape[1]}")
 
     y_train = np.load(data_dir / "y_train.npy", mmap_mode="r")
     pos = float(y_train.sum())
@@ -178,13 +191,14 @@ def main():
         drop_last=False,
     )
 
-    model = UNetSmall(in_ch=args.history, base=args.base).to(device)
+    model = UNetSmall(in_ch=in_ch, base=args.base).to(device)
     pos_weight = torch.tensor([pos_weight_value], dtype=torch.float32, device=device)
     bce = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
 
     config = vars(args)
     config["device"] = str(device)
+    config["in_ch"] = int(in_ch)
     config["pos_weight"] = pos_weight_value
     (run_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 

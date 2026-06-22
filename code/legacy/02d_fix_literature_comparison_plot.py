@@ -7,8 +7,11 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from importlib.machinery import SourceFileLoader
 
-OUT_DIR = Path("/ybz/ybz/2026/MHWNeurRL/outputs/02_label_validation/literature_comparison")
+cfg = SourceFileLoader("cfg", str(Path(__file__).with_name("00_config.py"))).load_module()
+
+OUT_DIR = cfg.OUTPUT_DIR / "02_label_validation" / "literature_comparison"
 csv_path = OUT_DIR / "jja_mhw_days_1982_2020.csv"
 summary_path = OUT_DIR / "literature_comparison_summary.json"
 

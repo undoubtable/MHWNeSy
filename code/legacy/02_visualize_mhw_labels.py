@@ -3,8 +3,8 @@
 Visualize generated MHW labels.
 
 Outputs:
-    /ybz/ybz/2026/MHWNeurRL/figures/02_labels/mhw_map_YYYY-MM-DD.png
-    /ybz/ybz/2026/MHWNeurRL/figures/02_labels/mhw_area_YEAR.png
+    outputs/02_label_visualization/mhw_map_YYYY-MM-DD.png
+    outputs/02_label_visualization/mhw_area_YEAR.png
 """
 
 import argparse

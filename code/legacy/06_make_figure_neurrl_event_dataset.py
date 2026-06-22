@@ -9,7 +9,7 @@ Idea:
     Label candidate as valid if it overlaps a true MHW component.
 
 Outputs:
-    /ybz/ybz/2026/MHWNeurRL/data/event_h10_l5/
+    outputs/06_neurrl_event_dataset_h10_l5/
         figure_event_train.npz
         figure_event_val.npz
         figure_event_test.npz

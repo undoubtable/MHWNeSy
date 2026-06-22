@@ -3,10 +3,10 @@
 Create Hobday-style Marine Heatwave labels from daily OISST.
 
 Input:
-    /ybz/ybz/2026/MHWNeurRL/data/oisst_scs_1982_2023.nc
+    data/oisst_scs_1982_2023.nc
 
 Output:
-    /ybz/ybz/2026/MHWNeurRL/data/processed/mhw_labels_1982_2023.nc
+    outputs/01_mhw_labels/mhw_labels_strict_hobday_1982_2023.nc
 
 Main variables saved:
     ssta(time, lat, lon)          float32
