@@ -38,3 +38,13 @@ runs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Test experiment outputs
+test/outputs/
+test/logs/
+test/**/*.pt
+test/**/*.pth
+test/**/*.npy
+test/**/*.npz
+test/**/*.nc
+test/**/*.pkl
