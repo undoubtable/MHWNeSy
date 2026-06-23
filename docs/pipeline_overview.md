@@ -4,7 +4,7 @@
 
 MHW-NeurRL studies South China Sea marine heatwave forecasting and interpretable event-level verification. The forecasting target is a 5-day lead MHW mask. The verification target is whether each predicted connected component is a valid candidate MHW event or a false positive.
 
-The main performance gain comes from the multichannel forecasting input. The symbolic rule verifier provides a small but interpretable correction on top of the strong multichannel U-Net baseline.
+The full GitHub-facing pipeline has been verified from Stage 1 to Stage 7. The main performance gain comes from the multichannel U-Net input design. The event-level symbolic rule verifier gives a small but positive pixel-level improvement and removes false-positive candidate events with 85.7% event-level removal precision. Region-level rules provide NeurRL-style spatial interpretability.
 
 ## GitHub-facing Data Flow
 
@@ -53,35 +53,56 @@ The detailed intermediate scripts are archived under `code/legacy/`. The root-le
 |---|---:|---:|---:|---:|---:|
 | Persistence baseline | 0.7483 | 0.7472 | 0.7478 | 0.5972 | 0.8971 |
 | SSTA-only U-Net | 0.5817 | 0.8251 | 0.6824 | 0.5179 | 0.8431 |
-| Multichannel U-Net | 0.7433 | 0.8180 | 0.7789 | 0.6378 | 0.9051 |
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
 
-The multichannel U-Net improves substantially over SSTA-only U-Net and beats persistence in F1, IoU/CSI, and accuracy.
+Persistence baseline and SSTA-only U-Net are retained as historical/reference baselines. The multichannel U-Net row is the latest result from the full 01-07 rerun. The main performance gain comes from the multichannel forecasting input.
 
 ### Symbolic Rule Verifier
 
 | Model | Precision | Recall | F1 | IoU/CSI | Accuracy |
 |---|---:|---:|---:|---:|---:|
-| Multichannel U-Net | 0.743348 | 0.817988 | 0.778884 | 0.637846 | 0.905145 |
-| Multichannel U-Net + symbolic rule verifier | 0.743730 | 0.817932 | 0.779068 | 0.638093 | 0.905252 |
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
+| Multichannel U-Net + symbolic rule verifier | 0.734164 | 0.815551 | 0.772720 | 0.629621 | 0.902016 |
 
-The pixel-level improvement is small. The main value is interpretability: the rules remove a small set of false-positive event candidates with high precision.
+Delta rule verifier - baseline:
+
+```text
+Precision = +0.000835
+Recall    = -0.000159
+F1        = +0.000391
+IoU/CSI   = +0.000519
+Accuracy  = +0.000238
+```
+
+The symbolic rule verifier provides a small pixel-level improvement on top of the multichannel U-Net. Its main contribution is not large segmentation improvement, but interpretable event-level false-positive filtering.
 
 Event-level deletion statistics:
 
 ```text
-test candidate events: 12206
-removed by symbolic rule: 96
-correctly removed invalid events: 82
-wrongly removed valid events: 14
-event-level removal precision: 85.4%
-removed-event ratio: 0.786%
+test candidate events: 12484
+removed by symbolic rule: 91
+correctly removed invalid events: 78
+wrongly removed valid events: 13
+event-level removal precision: 85.7%
+removed-event ratio: 0.729%
 ```
+
+The rule verifier removed only 0.729% of candidate events, but 85.7% of the removed events were invalid candidates. This indicates that the rule verifier behaves as a conservative high-precision, low-recall false-positive filter.
 
 ## Rule Module Positioning
 
-Event-level symbolic rules are learned from candidate-event summary features, such as recent threshold support, historical MHW days, exceedance days, and component area behavior. They are used for conservative correction.
+Event-level symbolic rules are learned from candidate-event summary features and are used for conservative correction. The main rule is:
 
-Region-level / NeurRL-style rules are learned from a fixed 4 x 4 grid over each event patch. They provide spatial explanations such as `TGAP_R2C1_LOW` or `EXCEED90_R3C3_ACTIVE`. They are mainly for spatial interpretability, not the main correction mechanism.
+```text
+IF recent threshold_gap inside candidate <= 0
+THEN remove candidate as invalid
+```
+
+This rule removes candidate MHW events whose recent threshold support is weak.
+
+Region-level / NeurRL-style rules are learned from a fixed 4 x 4 grid over each event patch. They provide spatial explanations such as `EXCEED90_R3C3_ACTIVE` or `MHW_R3C3_ACTIVE`. `R3C3` denotes a spatial region in the 4 x 4 patch grid. Region-level rules are mainly used to visualize which physical channels and spatial regions support the candidate-event decision.
+
+Event-level rules are used for conservative correction, while region-level rules are used mainly for NeurRL-style spatial interpretability.
 
 ## Two Rule Figure Types
 
@@ -91,7 +112,7 @@ Event-level rule figures:
 outputs/25b_event_symbolic_rule_visualization/
 ```
 
-These show a triggering candidate event, its threshold_gap, target MHW, original prediction, candidate component, TP/FP/FN overlay, and actual atom values.
+These show event-level symbolic rule metrics, triggering cases, and key atom distributions.
 
 Region-level rule figures:
 
@@ -100,3 +121,11 @@ outputs/28_region_rule_visualization/
 ```
 
 These show top spatial rules and representative patches. Yellow boxes mark the 4 x 4 grid cells used by each rule.
+
+Removed-event compact figures:
+
+```text
+outputs/24b_removed_rule_event_compact_visualization/
+```
+
+These show the rule deletion effect, including target MHW, original prediction, removed component, corrected prediction, and TP/FP/FN overlay.

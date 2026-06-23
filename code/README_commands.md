@@ -1,15 +1,16 @@
-# MHW-NeurRL Compact Pipeline Commands
+# MHW-NeurRL Commands
 
-The GitHub-facing pipeline is intentionally compact. Use the root-level scripts in `code/`; detailed intermediate scripts are archived under `code/legacy/`.
+The GitHub-facing pipeline is intentionally compact. Use the root-level scripts in `code/`; detailed intermediate scripts and old experiment scripts are archived under `code/legacy/`.
 
 Run from the repository root:
 
 ```bash
 cd /path/to/MHWNeurRL
 export MHWNEURRL_ROOT=$PWD
+pip install -r requirements.txt
 ```
 
-## 0. Configuration
+## 1. Environment
 
 Script:
 
@@ -36,7 +37,42 @@ Outputs:
 outputs/
 ```
 
-## 1. Build Labels
+## 2. Data Preparation
+
+The raw NOAA OISST file is not included in the GitHub repository. Place it at:
+
+```text
+data/oisst_scs_1982_2023.nc
+```
+
+The strict Hobday-style label definition uses:
+
+```text
+climatology: 1982-2011
+percentile: 90th
+minimum duration: 5 days
+maximum gap: 2 days
+```
+
+## 3. Main 01-07 Pipeline
+
+Recommended full run:
+
+```bash
+python code/01_build_labels.py --all
+python code/02_build_forecast_dataset.py --mode multichannel
+python code/03_train_eval_unet.py --model multichannel --train --eval
+python code/04_build_event_dataset.py --source multichannel
+python code/05_learn_rules.py --type all
+python code/06_apply_rule_verifier.py --all
+python code/07_visualize_results.py --type all
+```
+
+The main model path is the multichannel U-Net. SSTA-only commands remain available as historical/control baselines.
+
+## 4. Stage-by-Stage Commands
+
+### Stage 1: Build Labels
 
 Script:
 
@@ -87,7 +123,7 @@ legacy/02_visualize_mhw_labels.py
 legacy/02b_validate_mhw_labels.py
 ```
 
-## 2. Build Forecast Dataset
+### Stage 2: Build Forecast Dataset
 
 Script:
 
@@ -135,7 +171,7 @@ legacy/03_make_forecast_dataset.py
 legacy/03b_make_forecast_dataset_multichannel.py
 ```
 
-## 3. Train and Evaluate U-Net
+### Stage 3: Train and Evaluate U-Net
 
 Script:
 
@@ -188,7 +224,7 @@ legacy/04c_train_unet_multichannel.py
 legacy/05c_eval_unet_multichannel.py
 ```
 
-## 4. Build Event Dataset
+### Stage 4: Build Event Dataset
 
 Script:
 
@@ -241,7 +277,7 @@ legacy/06c_make_figure_event_dataset_multichannel.py
 legacy/07c_make_multineurrl_event_sequence_multichannel.py
 ```
 
-## 5. Learn Rules
+### Stage 5: Learn Rules
 
 Script:
 
@@ -292,7 +328,7 @@ legacy/26_build_region_rule_atoms.py
 legacy/27_learn_region_rules.py
 ```
 
-## 6. Apply Rule Verifier
+### Stage 6: Apply Rule Verifier
 
 Script:
 
@@ -341,7 +377,7 @@ legacy/22_apply_event_rule_verifier.py
 legacy/23_compare_multichannel_unet_vs_rule_verifier.py
 ```
 
-## 7. Visualize Results
+### Stage 7: Visualize Results
 
 Script:
 
@@ -395,25 +431,107 @@ legacy/25b_visualize_event_symbolic_rules.py
 legacy/28_visualize_region_rules.py
 ```
 
-## Main Run Order
+## 5. Main Outputs
 
-```bash
-python code/01_build_labels.py --all
-python code/02_build_forecast_dataset.py --mode multichannel
-python code/03_train_eval_unet.py --model multichannel --train --eval
-python code/04_build_event_dataset.py --source multichannel
-python code/05_learn_rules.py --type all
-python code/06_apply_rule_verifier.py --all
-python code/07_visualize_results.py --type all
+```text
+outputs/24b_removed_rule_event_compact_visualization/
 ```
 
-## Legacy Scripts
+Shows the rule deletion effect, including target MHW, original prediction, removed component, corrected prediction, and TP/FP/FN overlay.
+
+```text
+outputs/25b_event_symbolic_rule_visualization/
+```
+
+Shows event-level symbolic rule metrics, triggering cases, and key atom distributions.
+
+```text
+outputs/28_region_rule_visualization/
+```
+
+Shows region-level / NeurRL-style rule figures, with region boxes marking rule-triggered locations on the patch.
+
+## 6. Latest Reproducible Results
+
+### Forecasting baseline comparison
+
+Persistence baseline and SSTA-only U-Net are retained as historical/reference baselines. The multichannel U-Net row is the latest result from the full 01-07 rerun.
+
+| Model | Precision | Recall | F1 | IoU/CSI | Accuracy |
+|---|---:|---:|---:|---:|---:|
+| Persistence baseline | 0.7483 | 0.7472 | 0.7478 | 0.5972 | 0.8971 |
+| SSTA-only U-Net | 0.5817 | 0.8251 | 0.6824 | 0.5179 | 0.8431 |
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
+
+The main performance gain comes from the multichannel forecasting input. The symbolic rule verifier provides a small but interpretable correction on top of the strong multichannel U-Net baseline.
+
+### Symbolic rule verifier
+
+| Model | Precision | Recall | F1 | IoU/CSI | Accuracy |
+|---|---:|---:|---:|---:|---:|
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
+| Multichannel U-Net + symbolic rule verifier | 0.734164 | 0.815551 | 0.772720 | 0.629621 | 0.902016 |
+
+Delta rule verifier - baseline:
+
+```text
+Precision = +0.000835
+Recall    = -0.000159
+F1        = +0.000391
+IoU/CSI   = +0.000519
+Accuracy  = +0.000238
+```
+
+The symbolic rule verifier provides a small pixel-level improvement on top of the multichannel U-Net. Its main contribution is not large segmentation improvement, but interpretable event-level false-positive filtering.
+
+Event-level deletion statistics:
+
+```text
+test candidate events: 12484
+removed by symbolic rule: 91
+correctly removed invalid events: 78
+wrongly removed valid events: 13
+event-level removal precision: 85.7%
+removed-event ratio: 0.729%
+```
+
+The rule verifier removed only 0.729% of candidate events, but 85.7% of the removed events were invalid candidates. This indicates that the rule verifier behaves as a conservative high-precision, low-recall false-positive filter.
+
+## 7. Rule Interpretation
+
+### Event-level symbolic rules
+
+Event-level rules are used for actual correction / verifier behavior. The main rule is:
+
+```text
+IF recent threshold_gap inside candidate <= 0
+THEN remove candidate as invalid
+```
+
+This rule removes candidate MHW events whose recent threshold support is weak.
+
+### Region-level / NeurRL-style rules
+
+Region-level / NeurRL-style rules are used for spatial interpretability, not as the main correction metric. Examples:
+
+```text
+IF EXCEED90_R3C3_ACTIVE THEN valid candidate
+IF MHW_R3C3_ACTIVE THEN valid candidate
+```
+
+`R3C3` denotes a spatial region in the 4 x 4 patch grid. Region-level rules are mainly used to visualize which physical channels and spatial regions support the candidate-event decision.
+
+Event-level rules are used for conservative correction, while region-level rules are used mainly for NeurRL-style spatial interpretability.
+
+## 8. Legacy Scripts
 
 Legacy scripts are archived under:
 
 ```text
 code/legacy/
 ```
+
+They are intermediate scripts and old experiment scripts from development. They are kept for reproducibility and traceability, but GitHub users should run the compact `code/01_build_labels.py` through `code/07_visualize_results.py` entrypoints.
 
 See:
 

@@ -16,7 +16,7 @@ MHW-NeurRL 的主要流程包括：
 6. 构建 region-level / NeurRL-style rules，用于空间可解释性展示；
 7. 输出 compact removed-event visualization、event-level rule visualization 和 region-level rule visualization。
 
-核心结论是：主要性能提升来自 multichannel forecasting input；symbolic rule verifier 的像素级提升较小，但提供了可解释的事件级 false-positive filtering 机制。
+核心结论是：The main performance gain comes from the multichannel forecasting input. The symbolic rule verifier provides a small but interpretable correction on top of the strong multichannel U-Net baseline.
 
 ## 目录结构
 
@@ -42,7 +42,7 @@ MHWNeurRL/
         └── ... intermediate experiment scripts
 ```
 
-推荐阅读和运行 `code/00_config.py` 以及 `code/01_build_labels.py` 到 `code/07_visualize_results.py`。旧的分散实验脚本保存在 `code/legacy/`，用于复现中间步骤和保留开发记录。
+推荐阅读和运行 `code/00_config.py` 以及 `code/01_build_labels.py` 到 `code/07_visualize_results.py`。旧的分散实验脚本保存在 `code/legacy/`，用于复现中间步骤和保留开发记录。GitHub 用户推荐使用 `code/01_build_labels.py` 到 `code/07_visualize_results.py` 这些主入口。
 
 ## 环境安装
 
@@ -148,47 +148,49 @@ python code/03_train_eval_unet.py --model ssta --train --eval
 |---|---:|---:|---:|---:|---:|
 | Persistence baseline | 0.7483 | 0.7472 | 0.7478 | 0.5972 | 0.8971 |
 | SSTA-only U-Net | 0.5817 | 0.8251 | 0.6824 | 0.5179 | 0.8431 |
-| Multichannel U-Net | 0.7433 | 0.8180 | 0.7789 | 0.6378 | 0.9051 |
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
 
-Multichannel U-Net 相比 SSTA-only U-Net 有明显提升，并且在 F1、IoU/CSI 和 Accuracy 上超过 persistence baseline。
+Persistence baseline 和 SSTA-only U-Net 是历史对比/参考结果；Multichannel U-Net 使用本次从头跑通 01–07 主流程后的最新版 test 结果。The main performance gain comes from the multichannel forecasting input. The symbolic rule verifier provides a small but interpretable correction on top of the strong multichannel U-Net baseline.
 
 ### Symbolic rule verifier comparison
 
 | Model | Precision | Recall | F1 | IoU/CSI | Accuracy |
 |---|---:|---:|---:|---:|---:|
-| Multichannel U-Net | 0.743348 | 0.817988 | 0.778884 | 0.637846 | 0.905145 |
-| Multichannel U-Net + symbolic rule verifier | 0.743730 | 0.817932 | 0.779068 | 0.638093 | 0.905252 |
+| Multichannel U-Net | 0.733330 | 0.815710 | 0.772329 | 0.629101 | 0.901778 |
+| Multichannel U-Net + symbolic rule verifier | 0.734164 | 0.815551 | 0.772720 | 0.629621 | 0.902016 |
 
 Delta：
 
 ```text
-Precision: +0.000382
-Recall:    -0.000056
-F1:        +0.000184
-IoU/CSI:   +0.000247
-Accuracy:  +0.000108
+Precision: +0.000835
+Recall:    -0.000159
+F1:        +0.000391
+IoU/CSI:   +0.000519
+Accuracy:  +0.000238
 ```
 
-Symbolic rule verifier 带来的像素级提升很小，但它提供了一个可解释的事件级 false-positive filtering 机制。
+The symbolic rule verifier provides a small pixel-level improvement on top of the multichannel U-Net. Its main contribution is not large segmentation improvement, but interpretable event-level false-positive filtering.
+
+也就是说，symbolic rule verifier 在强 multichannel U-Net baseline 基础上只带来较小的像素级提升，其主要贡献是提供可解释的事件级误报过滤机制。
 
 ### Event-level rule deletion
 
 ```text
-test candidate events: 12206
-removed by symbolic rule: 96
-correctly removed invalid events: 82
-wrongly removed valid events: 14
-event-level removal precision: 85.4%
-removed-event ratio: 0.786%
+test candidate events: 12484
+removed by symbolic rule: 91
+correctly removed invalid events: 78
+wrongly removed valid events: 13
+event-level removal precision: 85.7%
+removed-event ratio: 0.729%
 ```
 
-这说明 rule verifier 是一个保守的、高精度、低召回 false-positive filter。
+The rule verifier removed only 0.729% of candidate events, but 85.7% of the removed events were invalid candidates. This indicates that the rule verifier behaves as a conservative high-precision, low-recall false-positive filter.
 
 ## 规则解释
 
 ### Event-level symbolic rules
 
-Event-level rules 主要用于实际 correction。规则来自候选事件的统计特征，例如 recent threshold support、historical MHW days、exceed90 days 和 component area behavior。
+Event-level rules 用于实际 correction / verifier。主要规则来自候选事件内部的 recent threshold support：
 
 示例：
 
@@ -197,20 +199,25 @@ IF recent threshold_gap inside candidate <= 0
 THEN remove candidate as invalid
 ```
 
-含义：如果候选事件最近一天在其内部没有足够的 90th percentile threshold 支持，则将其视为 weak-support false positive candidate。
+This rule removes candidate MHW events whose recent threshold support is weak.
 
 ### Region-level / NeurRL-style rules
 
-Region-level rules 主要用于空间可解释性展示，不是主 correction 机制。它们把 64 x 64 event patch 划分成 4 x 4 区域，并学习类似 `R(i,j)` 的空间规则。
+Region-level / NeurRL-style rules 用于空间可解释性展示，不作为主要 correction 指标。它们把 event patch 划分成 4 x 4 区域，并学习空间区域上的规则。
 
 示例：
 
 ```text
 IF EXCEED90_R3C3_ACTIVE
 THEN valid candidate
+
+IF MHW_R3C3_ACTIVE
+THEN valid candidate
 ```
 
-其中 `R3C3` 表示 4 x 4 patch 网格中的第 3 行第 3 列区域。
+`R3C3` denotes a spatial region in the 4 x 4 patch grid. Region-level rules are mainly used to visualize which physical channels and spatial regions support the candidate-event decision.
+
+Event-level rules are used for conservative correction, while region-level rules are used mainly for NeurRL-style spatial interpretability.
 
 ## 重要可视化输出
 
@@ -222,9 +229,9 @@ outputs/28_region_rule_visualization/
 
 其中：
 
-- `24b_removed_rule_event_compact_visualization/`：展示 symbolic rule 删除了哪些候选事件，以及删除是否正确；
-- `25b_event_symbolic_rule_visualization/`：展示 event-level symbolic rules 的触发样本和 atom 实际数值；
-- `28_region_rule_visualization/`：展示 NeurRL-style region rules 及其对应空间区域。
+- `24b_removed_rule_event_compact_visualization/`：展示规则删除前后效果，包括 target MHW、original prediction、removed component、corrected prediction、TP/FP/FN overlay；
+- `25b_event_symbolic_rule_visualization/`：展示 event-level symbolic rules 的规则指标、触发案例和关键 atom 分布；
+- `28_region_rule_visualization/`：展示 region-level / NeurRL-style 规则图，在 patch 上用 region 框标出规则触发位置。
 
 ## Legacy scripts
 
